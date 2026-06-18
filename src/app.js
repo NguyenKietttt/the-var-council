@@ -1,3 +1,4 @@
+const path = require('path');
 const express = require('express');
 const db = require('./db');
 const sync = require('./sync');
@@ -5,6 +6,39 @@ const { getPredictions } = require('./predict');
 
 const app = express();
 app.use(express.json());
+app.use('/icons', express.static(path.join(__dirname, '../public/icons')));
+
+const TEAM_FLAGS = {
+  'Algeria': '🇩🇿', 'Argentina': '🇦🇷', 'Australia': '🇦🇺', 'Austria': '🇦🇹',
+  'Belgium': '🇧🇪', 'Bosnia and Herzegovina': '🇧🇦', 'Brazil': '🇧🇷',
+  'Canada': '🇨🇦', 'Cape Verde': '🇨🇻', 'Colombia': '🇨🇴', 'Croatia': '🇭🇷',
+  'Curaçao': '🇨🇼', 'Czech Republic': '🇨🇿',
+  'Democratic Republic of the Congo': '🇨🇩',
+  'Ecuador': '🇪🇨', 'Egypt': '🇪🇬', 'England': '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
+  'France': '🇫🇷', 'Germany': '🇩🇪', 'Ghana': '🇬🇭',
+  'Haiti': '🇭🇹',
+  'Iran': '🇮🇷', 'Iraq': '🇮🇶', 'Ivory Coast': '🇨🇮',
+  'Japan': '🇯🇵', 'Jordan': '🇯🇴',
+  'Mexico': '🇲🇽', 'Morocco': '🇲🇦',
+  'Netherlands': '🇳🇱', 'New Zealand': '🇳🇿', 'Norway': '🇳🇴',
+  'Panama': '🇵🇦', 'Paraguay': '🇵🇾', 'Portugal': '🇵🇹',
+  'Qatar': '🇶🇦',
+  'Saudi Arabia': '🇸🇦', 'Scotland': '🏴󠁧󠁢󠁳󠁣󠁴󠁿', 'Senegal': '🇸🇳',
+  'South Africa': '🇿🇦', 'South Korea': '🇰🇷', 'Spain': '🇪🇸', 'Sweden': '🇸🇪',
+  'Switzerland': '🇨🇭',
+  'Tunisia': '🇹🇳', 'Turkey': '🇹🇷',
+  'United States': '🇺🇸', 'Uruguay': '🇺🇾', 'Uzbekistan': '🇺🇿',
+};
+
+function teamWithFlag(name) {
+  const flag = TEAM_FLAGS[name];
+  return flag ? `${flag} ${name}` : name;
+}
+
+function teamWithFlagAfter(name) {
+  const flag = TEAM_FLAGS[name];
+  return flag ? `${name} ${flag}` : name;
+}
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -64,7 +98,8 @@ function renderPage({ matches, syncError }) {
         .map((m) => {
           const home = m.home_team || m.home_team_label || '?';
           const away = m.away_team || m.away_team_label || '?';
-          const optLabel = `${formatTimeOnly(m.local_date_ict)}  ${home} vs ${away}`;
+          const score = m.finished ? `${m.home_score}–${m.away_score}` : '?–?';
+          const optLabel = `${formatTimeOnly(m.local_date_ict)}  ${teamWithFlag(home)} ${score} ${teamWithFlagAfter(away)}`;
           return `<option value="${m.id}" data-home="${escAttr(home)}" data-away="${escAttr(away)}">${optLabel}</option>`;
         })
         .join('\n            ');
@@ -84,7 +119,8 @@ function renderPage({ matches, syncError }) {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>World Cup 2026 · AI Predictions</title>
+  <title>The Var Council</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>⚽</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
@@ -310,14 +346,6 @@ function renderPage({ matches, syncError }) {
 
     .page-nav a:hover { background: var(--accent-dim); }
 
-    /* ── Footer ── */
-    footer {
-      margin-top: 64px;
-      font-size: 12px;
-      color: var(--text-muted);
-      font-family: 'Space Mono', monospace;
-    }
-
     /* ── Spinner ── */
     .spinner-wrap {
       background: var(--surface);
@@ -345,49 +373,7 @@ function renderPage({ matches, syncError }) {
       font-size: 14px;
     }
 
-    /* ── Prediction table ── */
-    .pred-table-wrap {
-      overflow-x: auto;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-    }
-
-    .pred-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 14px;
-    }
-
-    .pred-table th {
-      text-align: left;
-      padding: 14px 16px;
-      font-family: 'Space Mono', monospace;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      border-bottom: 1px solid var(--border);
-      white-space: nowrap;
-    }
-
-    .pred-table td {
-      padding: 14px 16px;
-      border-bottom: 1px solid var(--border);
-      vertical-align: top;
-    }
-
-    .pred-table tr:last-child td { border-bottom: none; }
-    .pred-table tbody tr:hover td { background: var(--surface-2); }
-
-    .model-name {
-      font-family: 'Space Mono', monospace;
-      font-size: 12px;
-      color: var(--text);
-      white-space: nowrap;
-    }
-
+    /* ── Pick badges ── */
     .pick-badge {
       display: inline-block;
       padding: 3px 10px;
@@ -402,42 +388,170 @@ function renderPage({ matches, syncError }) {
     .pick-away   { background: rgba(167, 139, 250, 0.15); color: #A78BFA; }
     .pick-failed { background: rgba(248, 113, 113, 0.10); color: var(--error-text); }
 
-    .reasoning-text { color: var(--text-muted); line-height: 1.5; }
+    /* ── Prediction bubbles ── */
+    .chat-feed {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
 
-    .cell-correct { background: rgba(34, 197, 94, 0.15); }
-    .cell-wrong   { background: rgba(248, 113, 113, 0.12); }
+    .chat-row {
+      display: flex;
+      flex-direction: column;
+      max-width: 72%;
+    }
 
-    .result-summary {
-      margin-bottom: 12px;
-      padding: 10px 14px;
+    .chat-row.left  { align-self: flex-start; }
+    .chat-row.right { align-self: flex-end; align-items: flex-end; }
+
+    .chat-sender {
+      font-family: 'Space Mono', monospace;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: var(--text);
+      margin-bottom: 4px;
+      padding: 0 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .model-icon {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      display: inline-block;
+    }
+
+    .chat-bubble {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .chat-row.left  .chat-bubble { border-top-left-radius: 4px; }
+    .chat-row.right .chat-bubble { border-top-right-radius: 4px; }
+
+    .bubble-pick { display: flex; align-items: center; gap: 6px; }
+    .result-icon { font-size: 18px; line-height: 1; display: flex; align-items: center; align-self: center; }
+
+    .bubble-reason {
+      font-size: 15px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* ── Vote bar ── */
+    .vote-bar-wrap {
+      margin-bottom: 16px;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
+      padding: 20px 20px 16px;
+    }
+
+    .vote-bar-teams {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
       font-family: 'Space Mono', monospace;
-      font-size: 13px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .vote-bar-teams .vbt-home { color: #38BDF8; }
+    .vote-bar-teams .vbt-away { color: #A78BFA; }
+
+    .vote-bar {
+      display: flex;
+      height: 44px;
+      border-radius: 6px;
+      overflow: hidden;
+      gap: 2px;
+    }
+
+    .vb-seg {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Space Mono', monospace;
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .vb-home { background: #38BDF8; }
+    .vb-draw { background: #64748B; }
+    .vb-away { background: #A78BFA; }
+
+    .vote-bar-legend {
+      display: flex;
+      gap: 16px;
+      margin-top: 12px;
+      font-size: 12px;
       color: var(--text-muted);
     }
 
-    @media (max-width: 480px) {
-      .selector-card { padding: 20px 16px 24px; }
-      select#match-select { font-size: 11px; }
+    .vbl-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      margin-right: 5px;
+      vertical-align: middle;
+    }
+
+    .vbl-dot.home { background: #38BDF8; }
+    .vbl-dot.draw { background: #64748B; }
+    .vbl-dot.away { background: #A78BFA; }
+
+    @media (max-width: 600px) {
+      body { padding: 28px 14px 60px; }
+
+      .site-header { margin-bottom: 32px; }
+      .site-header .subtitle { font-size: 13px; }
+
+      .selector-card { padding: 18px 14px 22px; }
+      select#match-select { font-size: 12px; padding: 10px 36px 10px 12px; }
+      .selector-hint { font-size: 11px; }
+
+      .page-nav { margin-bottom: 18px; }
+
+      .chat-row { max-width: 88%; }
+      .chat-sender { font-size: 12px; }
+      .chat-bubble { padding: 10px 12px; }
+      .pick-badge { font-size: 11px; padding: 2px 7px; }
+      .bubble-reason { font-size: 14px; }
+
+      .vote-bar-wrap { padding: 14px 14px 12px; }
+      .vote-bar-teams { font-size: 11px; }
+      .vote-bar { height: 36px; }
+      .vb-seg { font-size: 13px; }
+      .vote-bar-legend { gap: 10px; font-size: 11px; flex-wrap: wrap; }
+
+      .placeholder-msg { padding: 28px 16px; }
     }
   </style>
 </head>
 <body>
   <header class="site-header">
-    <p class="eyebrow">FIFA World Cup 2026</p>
-    <h1>AI <em>Predictions</em></h1>
-    <p class="subtitle">8 language models predict every match. Select one to see their picks.</p>
+    <p class="eyebrow">THE VAR COUNCIL</p>
+    <h1><em>Predictions</em></h1>
+    <p class="subtitle">World Cup 2026 — 8 language models predict every match. Select one to see their picks.</p>
   </header>
 
   ${errorBanner}
 
   <nav class="page-nav">
-    <a href="/leaderboard">&#9651; Model Leaderboard</a>
+    <a href="/leaderboard">Leaderboard</a>
   </nav>
 
-  <main>
+  <main style="width:100%;max-width:740px;">
     <section class="selector-card">
       <label for="match-select">Select a match</label>
       <div class="select-wrapper">
@@ -453,13 +567,10 @@ function renderPage({ matches, syncError }) {
 
     <div id="prediction-area" class="prediction-area">
       <div class="placeholder-msg">
-        <strong>Predictions</strong>
         Select a match above to load AI predictions.
       </div>
     </div>
   </main>
-
-  <footer>worldcup26.ir · ${matches.length} matches loaded</footer>
 
   <script>
   (function () {
@@ -472,10 +583,31 @@ function renderPage({ matches, syncError }) {
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
+    var MODEL_ICON_MAP = {
+      'minimax':  'minimax-color.svg',
+      'glm':      'zai.svg',
+      'kimi':     'kimi-color.svg',
+      'qwen':     'qwen-color.svg',
+      'deepseek': 'deepseek-color.svg',
+      'claude':   'claude-color.svg',
+      'gemini':   'google-color.svg',
+      'gpt':      'openai.svg',
+    };
+
+    function modelIcon(name) {
+      var lower = (name || '').toLowerCase();
+      for (var prefix in MODEL_ICON_MAP) {
+        if (lower.indexOf(prefix) === 0) {
+          return '<img src="/icons/' + MODEL_ICON_MAP[prefix] + '" class="model-icon" alt="">';
+        }
+      }
+      return '';
+    }
+
     function pickBadge(pick, home, away) {
-      if (pick === 'home') return '<span class="pick-badge pick-home">' + esc(home) + ' Win</span>';
+      if (pick === 'home') return '<span class="pick-badge pick-home">' + esc(home) + '</span>';
       if (pick === 'draw') return '<span class="pick-badge pick-draw">Draw</span>';
-      if (pick === 'away') return '<span class="pick-badge pick-away">' + esc(away) + ' Win</span>';
+      if (pick === 'away') return '<span class="pick-badge pick-away">' + esc(away) + '</span>';
       return '<span class="pick-badge pick-failed">Prediction unavailable</span>';
     }
 
@@ -488,73 +620,103 @@ function renderPage({ matches, syncError }) {
       return 'draw';
     }
 
-    function renderTable(predictions, match, home, away) {
-      var actualResult = deriveResult(match);
-      var correctCount = 0;
+    function renderVoteBar(predictions, home, away) {
+      var counts = { home: 0, draw: 0, away: 0 };
+      predictions.forEach(function (p) {
+        if (!p.failed && counts.hasOwnProperty(p.pick)) counts[p.pick]++;
+      });
+      var total = counts.home + counts.draw + counts.away;
+      if (total === 0) return '';
 
-      var rows = predictions.slice()
+      function seg(cls, count) {
+        if (count === 0) return '';
+        return '<div class="vb-seg ' + cls + '" style="flex:' + count + '">' + count + '</div>';
+      }
+
+      return '<div class="vote-bar-wrap">' +
+        '<div class="vote-bar-teams">' +
+          '<span class="vbt-home">' + esc(home) + '</span>' +
+          '<span class="vbt-away">' + esc(away) + '</span>' +
+        '</div>' +
+        '<div class="vote-bar">' +
+          seg('vb-home', counts.home) +
+          seg('vb-draw', counts.draw) +
+          seg('vb-away', counts.away) +
+        '</div>' +
+        '<div class="vote-bar-legend">' +
+          '<span><span class="vbl-dot home"></span>' + esc(home) + ' Win</span>' +
+          '<span><span class="vbl-dot draw"></span>Draw</span>' +
+          '<span><span class="vbl-dot away"></span>' + esc(away) + ' Win</span>' +
+        '</div>' +
+      '</div>';
+    }
+
+    function renderBubbles(predictions, match, home, away) {
+      var actualResult = deriveResult(match);
+
+      var bubbles = predictions.slice()
         .sort(function (a, b) { return a.model_name.localeCompare(b.model_name); })
-        .map(function (p) {
+        .map(function (p, i) {
+          var side = i % 2 === 0 ? 'left' : 'right';
           var isCorrect = actualResult && !p.failed && p.pick === actualResult;
           var isWrong   = actualResult && (p.failed || p.pick !== actualResult);
-          if (isCorrect) correctCount++;
-          var cellClass = isCorrect ? ' class="cell-correct"' : (isWrong ? ' class="cell-wrong"' : '');
+          var iconHtml  = isCorrect ? '<span class="result-icon">✅</span>'
+                        : isWrong   ? '<span class="result-icon">❌</span>'
+                        : '';
 
-          if (p.failed) {
-            return '<tr>' +
-              '<td><span class="model-name">' + esc(p.model_name) + '</span></td>' +
-              '<td' + cellClass + '><span class="pick-badge pick-failed">Prediction unavailable</span></td>' +
-              '<td class="reasoning-text" style="font-style:italic">Prediction unavailable</td>' +
-              '</tr>';
-          }
-          return '<tr>' +
-            '<td><span class="model-name">' + esc(p.model_name) + '</span></td>' +
-            '<td' + cellClass + '>' + pickBadge(p.pick, home, away) + '</td>' +
-            '<td class="reasoning-text">' + esc(p.reasoning || '') + '</td>' +
-            '</tr>';
+          var badgeHtml = '<div class="bubble-pick">' + (p.failed
+            ? '<span class="pick-badge pick-failed">Prediction unavailable</span>'
+            : pickBadge(p.pick, home, away)) + iconHtml + '</div>';
+
+          var reasonHtml = p.failed
+            ? '<span class="bubble-reason" style="font-style:italic">Prediction unavailable</span>'
+            : '<span class="bubble-reason">' + esc(p.reasoning || '') + '</span>';
+
+          return '<div class="chat-row ' + side + '">' +
+            '<div class="chat-sender">' + modelIcon(p.model_name) + esc(p.model_name) + '</div>' +
+            '<div class="chat-bubble">' +
+              badgeHtml +
+              reasonHtml +
+            '</div>' +
+          '</div>';
         })
         .join('');
 
-      var summary = actualResult
-        ? '<p class="result-summary">' + correctCount + '/8 models predicted correctly</p>'
-        : '';
-
-      return summary + '<div class="pred-table-wrap">' +
-        '<table class="pred-table">' +
-          '<thead><tr><th>Model</th><th>Prediction</th><th>Reasoning</th></tr></thead>' +
-          '<tbody>' + rows + '</tbody>' +
-        '</table></div>';
+      return renderVoteBar(predictions, home, away) +
+        '<div class="chat-feed">' + bubbles + '</div>';
     }
 
-    function showSpinner() {
+    function showSpinner(generating) {
       area.innerHTML =
         '<div class="spinner-wrap">' +
           '<div class="spinner"></div>' +
-          '<p class="spinner-msg">Asking 8 AI models — this takes 10&ndash;30 seconds&hellip;</p>' +
+          '<p class="spinner-msg">' + (generating ? 'Asking 8 AI models — this takes 10–30 seconds…' : 'Loading predictions…') + '</p>' +
         '</div>';
     }
 
     async function loadPredictions(matchId, home, away) {
+      showSpinner(false);
+
       try {
         var r = await fetch('/api/predictions/' + matchId);
         if (r.ok) {
           var data = await r.json();
           if (data.predictions && data.predictions.length >= 8) {
             if (sel.value !== String(matchId)) return;
-            area.innerHTML = renderTable(data.predictions, data.match, home, away);
+            area.innerHTML = renderBubbles(data.predictions, data.match, home, away);
             return;
           }
         }
       } catch (_) {}
 
-      showSpinner();
+      showSpinner(true);
 
       try {
         var r2 = await fetch('/api/predict/' + matchId, { method: 'POST' });
         if (!r2.ok) throw new Error('HTTP ' + r2.status);
         var data2 = await r2.json();
         if (sel.value !== String(matchId)) return;
-        area.innerHTML = renderTable(data2.predictions, data2.match, home, away);
+        area.innerHTML = renderBubbles(data2.predictions, data2.match, home, away);
       } catch (err) {
         if (sel.value !== String(matchId)) return;
         area.innerHTML =
@@ -567,7 +729,6 @@ function renderPage({ matches, syncError }) {
       var matchId = sel.value;
       var home    = (opt.dataset && opt.dataset.home) || 'Home';
       var away    = (opt.dataset && opt.dataset.away) || 'Away';
-      area.innerHTML = '';
       loadPredictions(matchId, home, away);
     });
   })();
@@ -582,7 +743,8 @@ function renderLoadingPage(next) {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>World Cup 2026 · Loading</title>
+  <title>The Var Council · Loading</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>⚽</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
@@ -702,9 +864,9 @@ function renderLoadingPage(next) {
 </head>
 <body>
   <header class="site-header">
-    <p class="eyebrow">FIFA World Cup 2026</p>
-    <h1>AI <em>Predictions</em></h1>
-    <p class="subtitle">8 language models predict every match. Select one to see their picks.</p>
+    <p class="eyebrow">THE VAR COUNCIL</p>
+    <h1><em>Predictions</em></h1>
+    <p class="subtitle">World Cup 2026 — 8 language models predict every match. Select one to see their picks.</p>
   </header>
 
   <div class="loading-card">
@@ -812,11 +974,11 @@ app.get('/api/predictions/:matchId', async (req, res) => {
   }
 });
 
-app.get('/leaderboard', async (req, res) => {
-  if (!req.query.ready) {
-    return res.redirect('/loading?next=' + encodeURIComponent('/leaderboard?ready=1'));
-  }
+app.get('/leaderboard', (_req, res) => {
+  res.send(renderLeaderboardPage());
+});
 
+app.get('/api/leaderboard', async (_req, res) => {
   try {
     const result = await db.execute(`
       SELECT
@@ -841,35 +1003,22 @@ app.get('/leaderboard', async (req, res) => {
       GROUP BY p.model_name
       ORDER BY correct DESC, p.model_name ASC
     `);
-    res.send(renderLeaderboardPage({ rows: result.rows }));
+    res.json({ rows: result.rows });
   } catch (err) {
     console.error('Leaderboard DB error:', err);
-    res.status(500).send('Internal server error');
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-function renderLeaderboardPage({ rows }) {
-  const tableRows = rows.length === 0
-    ? `<tr><td colspan="5" class="empty-cell">No finished matches with predictions yet.</td></tr>`
-    : rows.map((r, i) => {
-      const acc = r.matches_predicted > 0
-        ? ((r.correct / r.matches_predicted) * 100).toFixed(1)
-        : '0.0';
-      return `<tr>
-          <td class="rank-cell">${i + 1}</td>
-          <td><span class="model-name">${escHtml(r.model_name)}</span></td>
-          <td class="num-cell">${r.correct}</td>
-          <td class="num-cell">${r.matches_predicted}</td>
-          <td class="num-cell">${acc}%</td>
-        </tr>`;
-    }).join('\n');
+function renderLeaderboardPage() {
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>World Cup 2026 · Model Leaderboard</title>
+  <title>The Var Council · Leaderboard</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>⚽</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
@@ -995,7 +1144,7 @@ function renderLeaderboardPage({ rows }) {
     }
 
     .lb-table tr:last-child td { border-bottom: none; }
-    .lb-table tbody tr:hover td { background: var(--surface-2); }
+
 
     .rank-cell {
       font-family: 'Space Mono', monospace;
@@ -1003,23 +1152,33 @@ function renderLeaderboardPage({ rows }) {
       font-weight: 700;
       color: var(--text-muted);
       width: 48px;
+      text-align: center;
     }
 
-    .lb-table tbody tr:first-child .rank-cell { color: var(--accent); }
 
     .model-name {
       font-family: 'Space Mono', monospace;
       font-size: 12px;
       color: var(--text);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .model-icon {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
     }
 
     .num-cell {
       font-family: 'Space Mono', monospace;
       font-size: 13px;
-      text-align: right;
+      text-align: center;
     }
 
-    .lb-table th:nth-child(n+3) { text-align: right; }
+    .lb-table th:nth-child(1),
+    .lb-table th:nth-child(n+3) { text-align: center; }
 
     .empty-cell {
       text-align: center;
@@ -1028,50 +1187,122 @@ function renderLeaderboardPage({ rows }) {
       font-size: 14px;
     }
 
-    footer {
-      margin-top: 64px;
-      font-size: 12px;
-      color: var(--text-muted);
-      font-family: 'Space Mono', monospace;
+    @media (max-width: 600px) {
+      body { padding: 28px 14px 60px; }
+      .site-header { margin-bottom: 32px; }
+      .site-header .subtitle { font-size: 13px; }
+      .page-nav { margin-bottom: 18px; }
+      .lb-table { font-size: 12px; }
+      .lb-table th { padding: 10px 8px; font-size: 10px; }
+      .lb-table td { padding: 10px 8px; }
+      .num-cell { font-size: 12px; }
+      .rank-cell { width: 32px; }
+      .model-name { font-size: 11px; word-break: break-word; }
     }
 
-    @media (max-width: 480px) {
-      .lb-table { font-size: 12px; }
-      .lb-table th, .lb-table td { padding: 10px 10px; }
+    .spinner-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 48px;
+      text-align: center;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 32px;
+      height: 32px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 16px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .spinner-msg {
+      color: var(--text-muted);
+      font-size: 14px;
     }
   </style>
 </head>
 <body>
   <header class="site-header">
-    <p class="eyebrow">FIFA World Cup 2026</p>
-    <h1>Model <em>Leaderboard</em></h1>
+    <p class="eyebrow">THE VAR COUNCIL</p>
+    <h1><em>Leaderboard</em></h1>
     <p class="subtitle">Ranked by total correct predictions across finished matches.</p>
   </header>
 
   <nav class="page-nav">
-    <a href="/">&#9651; AI Predictions</a>
+    <a href="/">Predictions</a>
   </nav>
 
   <main style="width:100%;max-width:740px;">
-    <div class="lb-wrap">
-      <table class="lb-table">
-        <thead>
-          <tr>
-            <th>Rank</th>
-            <th>Model</th>
-            <th>Correct</th>
-            <th>Predicted</th>
-            <th>Accuracy</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${tableRows}
-        </tbody>
-      </table>
+    <div id="lb-container">
+      <div class="spinner-wrap">
+        <div class="spinner"></div>
+        <p class="spinner-msg">Loading leaderboard&hellip;</p>
+      </div>
     </div>
   </main>
 
-  <footer>worldcup26.ir · ${rows.length} models ranked</footer>
+<script>
+  const MODEL_ICON_MAP = {
+    'minimax':  'minimax-color.svg',
+    'glm':      'zai.svg',
+    'kimi':     'kimi-color.svg',
+    'qwen':     'qwen-color.svg',
+    'deepseek': 'deepseek-color.svg',
+    'claude':   'claude-color.svg',
+    'gemini':   'google-color.svg',
+    'gpt':      'openai.svg',
+  };
+
+  function modelIcon(name) {
+    const lower = (name || '').toLowerCase();
+    for (const prefix in MODEL_ICON_MAP) {
+      if (lower.startsWith(prefix)) {
+        return \`<img src="/icons/\${MODEL_ICON_MAP[prefix]}" class="model-icon" alt="">\`;
+      }
+    }
+    return '';
+  }
+
+  fetch('/api/leaderboard')
+    .then(r => r.json())
+    .then(({ rows }) => {
+      const container = document.getElementById('lb-container');
+      if (!rows || rows.length === 0) {
+        container.innerHTML = '<div class="spinner-wrap"><p class="spinner-msg">No finished matches with predictions yet.</p></div>';
+        return;
+      }
+      const bodyRows = rows.map((r, i) => {
+        const acc = r.matches_predicted > 0
+          ? ((r.correct / r.matches_predicted) * 100).toFixed(1)
+          : '0.0';
+        const name = r.model_name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        return \`<tr>
+          <td class="rank-cell">\${i + 1}</td>
+          <td><span class="model-name">\${modelIcon(r.model_name)}\${name}</span></td>
+          <td class="num-cell">\${r.correct}</td>
+          <td class="num-cell">\${r.matches_predicted}</td>
+          <td class="num-cell">\${acc}%</td>
+        </tr>\`;
+      }).join('');
+      container.innerHTML = \`<div class="lb-wrap">
+        <table class="lb-table">
+          <thead><tr>
+            <th>Rank</th><th>Model</th><th>Correct</th><th>Predicted</th><th>Accuracy</th>
+          </tr></thead>
+          <tbody>\${bodyRows}</tbody>
+        </table>
+      </div>\`;
+    })
+    .catch(() => {
+      document.getElementById('lb-container').innerHTML = '<div class="spinner-wrap"><p class="spinner-msg">Failed to load leaderboard.</p></div>';
+    });
+</script>
 </body>
 </html>`;
 }
