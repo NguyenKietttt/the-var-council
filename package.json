@@ -1,5 +1,5 @@
 {
-  "name": "world-cup-2026-tracker",
+  "name": "the-var-council",
   "version": "1.0.0",
   "description": "World Cup 2026 LLM prediction tracker",
   "main": "src/server.js",
