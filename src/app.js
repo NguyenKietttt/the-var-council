@@ -495,6 +495,7 @@ function renderPage({ matches, syncError }) {
       margin-top: 12px;
       font-size: 12px;
       color: var(--text-muted);
+      justify-content: center;
     }
 
     .vbl-dot {
@@ -509,6 +510,39 @@ function renderPage({ matches, syncError }) {
     .vbl-dot.home { background: #38BDF8; }
     .vbl-dot.draw { background: #64748B; }
     .vbl-dot.away { background: #A78BFA; }
+
+    .vote-bar-container { position: relative; }
+
+    .vb-seg { cursor: pointer; }
+
+    .vb-tooltip {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 8px);
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 12px;
+      color: var(--text);
+      white-space: nowrap;
+      z-index: 100;
+      pointer-events: none;
+      transform: translateX(-50%);
+    }
+
+    .vb-tooltip.active { display: block; }
+
+    .vb-tooltip ul { margin: 0; padding: 0; list-style: none; }
+
+    .vb-tooltip li {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 0;
+    }
+
+    .vb-tooltip .model-icon { width: 16px; height: 16px; }
 
     @media (max-width: 600px) {
       body { padding: 28px 14px 60px; }
@@ -621,16 +655,21 @@ function renderPage({ matches, syncError }) {
     }
 
     function renderVoteBar(predictions, home, away) {
-      var counts = { home: 0, draw: 0, away: 0 };
+      var counts  = { home: 0, draw: 0, away: 0 };
+      var voters  = { home: [], draw: [], away: [] };
       predictions.forEach(function (p) {
-        if (!p.failed && counts.hasOwnProperty(p.pick)) counts[p.pick]++;
+        if (!p.failed && counts.hasOwnProperty(p.pick)) {
+          counts[p.pick]++;
+          voters[p.pick].push(p.model_name);
+        }
       });
       var total = counts.home + counts.draw + counts.away;
       if (total === 0) return '';
 
-      function seg(cls, count) {
+      function seg(cls, pick, count) {
         if (count === 0) return '';
-        return '<div class="vb-seg ' + cls + '" style="flex:' + count + '">' + count + '</div>';
+        var data = esc(JSON.stringify(voters[pick]));
+        return '<div class="vb-seg ' + cls + '" style="flex:' + count + '" data-voters="' + data + '">' + count + '</div>';
       }
 
       return '<div class="vote-bar-wrap">' +
@@ -638,10 +677,13 @@ function renderPage({ matches, syncError }) {
           '<span class="vbt-home">' + esc(home) + '</span>' +
           '<span class="vbt-away">' + esc(away) + '</span>' +
         '</div>' +
-        '<div class="vote-bar">' +
-          seg('vb-home', counts.home) +
-          seg('vb-draw', counts.draw) +
-          seg('vb-away', counts.away) +
+        '<div class="vote-bar-container">' +
+          '<div class="vote-bar">' +
+            seg('vb-home', 'home', counts.home) +
+            seg('vb-draw', 'draw', counts.draw) +
+            seg('vb-away', 'away', counts.away) +
+          '</div>' +
+          '<div class="vb-tooltip"></div>' +
         '</div>' +
         '<div class="vote-bar-legend">' +
           '<span><span class="vbl-dot home"></span>' + esc(home) + '</span>' +
@@ -734,6 +776,64 @@ function renderPage({ matches, syncError }) {
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(function () { loadPredictions(matchId, home, away); }, 1000);
     });
+
+    // Vote bar segment tooltips
+    (function () {
+      var isTouch = false;
+      document.addEventListener('touchstart', function () { isTouch = true; }, { once: true });
+
+      function tooltipFor(container) {
+        return container.querySelector('.vb-tooltip');
+      }
+
+      function showTooltip(seg) {
+        var container = seg.closest('.vote-bar-container');
+        var tooltip   = tooltipFor(container);
+        var names     = JSON.parse(seg.getAttribute('data-voters') || '[]');
+        tooltip.innerHTML = '<ul>' + names.map(function (n) {
+          return '<li>' + modelIcon(n) + esc(n) + '</li>';
+        }).join('') + '</ul>';
+        var cRect = container.getBoundingClientRect();
+        var sRect = seg.getBoundingClientRect();
+        tooltip.style.left = (sRect.left + sRect.width / 2 - cRect.left) + 'px';
+        tooltip.classList.add('active');
+      }
+
+      function hideAll() {
+        area.querySelectorAll('.vb-tooltip.active').forEach(function (t) {
+          t.classList.remove('active');
+        });
+      }
+
+      // Desktop hover
+      area.addEventListener('mouseover', function (e) {
+        if (isTouch) return;
+        var seg = e.target.closest('.vb-seg');
+        if (!seg) return;
+        showTooltip(seg);
+      });
+
+      area.addEventListener('mouseout', function (e) {
+        if (isTouch) return;
+        var seg = e.target.closest('.vb-seg');
+        if (!seg) return;
+        if (!seg.contains(e.relatedTarget)) {
+          hideAll();
+        }
+      });
+
+      // Mobile tap
+      area.addEventListener('click', function (e) {
+        if (!isTouch) return;
+        var seg = e.target.closest('.vb-seg');
+        if (!seg) { hideAll(); return; }
+        var container = seg.closest('.vote-bar-container');
+        var tooltip   = tooltipFor(container);
+        var wasActive = tooltip.classList.contains('active');
+        hideAll();
+        if (!wasActive) showTooltip(seg);
+      });
+    })();
   })();
   </script>
 </body>
