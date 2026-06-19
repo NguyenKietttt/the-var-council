@@ -724,12 +724,15 @@ function renderPage({ matches, syncError }) {
       }
     }
 
+    var debounceTimer = null;
     sel.addEventListener('change', function () {
       var opt     = sel.options[sel.selectedIndex];
       var matchId = sel.value;
       var home    = (opt.dataset && opt.dataset.home) || 'Home';
       var away    = (opt.dataset && opt.dataset.away) || 'Away';
-      loadPredictions(matchId, home, away);
+      showSpinner(false);
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(function () { loadPredictions(matchId, home, away); }, 1000);
     });
   })();
   </script>
@@ -1307,6 +1310,8 @@ function renderLeaderboardPage() {
 </html>`;
 }
 
+const inFlight = new Map();
+
 app.post('/api/predict/:matchId', async (req, res) => {
   const matchId = parseInt(req.params.matchId, 10);
   if (isNaN(matchId)) return res.status(400).json({ error: 'Invalid matchId' });
@@ -1331,7 +1336,10 @@ app.post('/api/predict/:matchId', async (req, res) => {
   }
 
   try {
-    const predictions = await getPredictions(matchId);
+    if (!inFlight.has(matchId)) {
+      inFlight.set(matchId, getPredictions(matchId).finally(() => inFlight.delete(matchId)));
+    }
+    const predictions = await inFlight.get(matchId);
     res.json({ predictions, match });
   } catch (err) {
     console.error('Prediction error:', err);
