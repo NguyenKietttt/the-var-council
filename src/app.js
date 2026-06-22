@@ -325,6 +325,8 @@ function renderPage({ matches, syncError }) {
       width: 100%;
       max-width: 740px;
       margin-bottom: 24px;
+      display: flex;
+      gap: 8px;
     }
 
     .page-nav a {
@@ -345,6 +347,7 @@ function renderPage({ matches, syncError }) {
     }
 
     .page-nav a:hover { background: var(--accent-dim); }
+    .page-nav a.active { background: var(--accent); color: #0F172A; }
 
     /* ── Spinner ── */
     .spinner-wrap {
@@ -582,6 +585,7 @@ function renderPage({ matches, syncError }) {
   ${errorBanner}
 
   <nav class="page-nav">
+    <a href="/" class="active">Predictions</a>
     <a href="/leaderboard">Leaderboard</a>
   </nav>
 
@@ -1191,6 +1195,8 @@ function renderLeaderboardPage() {
       width: 100%;
       max-width: 740px;
       margin-bottom: 24px;
+      display: flex;
+      gap: 8px;
     }
 
     .page-nav a {
@@ -1211,6 +1217,7 @@ function renderLeaderboardPage() {
     }
 
     .page-nav a:hover { background: var(--accent-dim); }
+    .page-nav a.active { background: var(--accent); color: #0F172A; }
 
     .lb-wrap {
       width: 100%;
@@ -1339,6 +1346,7 @@ function renderLeaderboardPage() {
 
   <nav class="page-nav">
     <a href="/">Predictions</a>
+    <a href="/leaderboard" class="active">Leaderboard</a>
   </nav>
 
   <main style="width:100%;max-width:740px;">
