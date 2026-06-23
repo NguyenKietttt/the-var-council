@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: world-cup-2026-tracker
+    name: the-var-council
     env: node
     plan: free
     buildCommand: npm install
