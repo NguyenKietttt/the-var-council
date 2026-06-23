@@ -327,6 +327,7 @@ function renderPage({ matches, syncError }) {
       margin-bottom: 24px;
       display: flex;
       gap: 8px;
+      flex-wrap: wrap;
     }
 
     .page-nav a {
@@ -588,6 +589,7 @@ function renderPage({ matches, syncError }) {
     <a href="/" class="active">Predictions</a>
     <a href="/leaderboard">Leaderboard</a>
     <a href="/tables">Tables</a>
+    <a href="/knockout">Knockout</a>
   </nav>
 
   <main style="width:100%;max-width:740px;">
@@ -1247,6 +1249,7 @@ function renderLeaderboardPage() {
       margin-bottom: 24px;
       display: flex;
       gap: 8px;
+      flex-wrap: wrap;
     }
 
     .page-nav a {
@@ -1398,6 +1401,7 @@ function renderLeaderboardPage() {
     <a href="/">Predictions</a>
     <a href="/leaderboard" class="active">Leaderboard</a>
     <a href="/tables">Tables</a>
+    <a href="/knockout">Knockout</a>
   </nav>
 
   <main style="width:100%;max-width:740px;">
@@ -1660,6 +1664,7 @@ function renderTablesPage(groups) {
       margin-bottom: 32px;
       display: flex;
       gap: 8px;
+      flex-wrap: wrap;
     }
 
     .page-nav a {
@@ -1823,6 +1828,7 @@ function renderTablesPage(groups) {
     <a href="/">Predictions</a>
     <a href="/leaderboard">Leaderboard</a>
     <a href="/tables" class="active">Tables</a>
+    <a href="/knockout">Knockout</a>
   </nav>
 
   <main style="width:100%;max-width:1280px;">
@@ -1833,6 +1839,267 @@ function renderTablesPage(groups) {
 </body>
 </html>`;
 }
+
+// ─── Knockout bracket ──────────────────────────────────────────────────────
+
+const KO_ROUNDS_CFG = [
+  { type: 'r32',   label: 'Round of 32'   },
+  { type: 'r16',   label: 'Round of 16'   },
+  { type: 'qf',    label: 'Quarterfinals' },
+  { type: 'sf',    label: 'Semifinals'    },
+  { type: 'third', label: 'Third Place'   },
+  { type: 'final', label: 'Final'         },
+];
+
+function parseMatchRef(label) {
+  const m = label && label.match(/Winner Match (\d+)/i);
+  return m ? m[1] : null;
+}
+
+function buildBracketOrder(allMatches) {
+  const byApiId = {};
+  for (const m of allMatches) byApiId[m.api_id] = m;
+  const byType = {};
+  for (const m of allMatches) {
+    if (!byType[m.type]) byType[m.type] = [];
+    byType[m.type].push(m);
+  }
+  const finalMatch = (byType['final'] || [])[0];
+  if (!finalMatch) return null;
+
+  function collectLeaves(apiId) {
+    const m = byApiId[apiId];
+    if (!m) return [];
+    if (m.type === 'r32') return [m];
+    const homeId = parseMatchRef(m.home_team_label);
+    const awayId = parseMatchRef(m.away_team_label);
+    return [
+      ...(homeId ? collectLeaves(homeId) : []),
+      ...(awayId ? collectLeaves(awayId) : []),
+    ];
+  }
+  const r32Order = collectLeaves(finalMatch.api_id);
+
+  function findParent(id1, id2, candidates) {
+    return candidates.find(m => {
+      const h = parseMatchRef(m.home_team_label);
+      const a = parseMatchRef(m.away_team_label);
+      return (h === id1 && a === id2) || (h === id2 && a === id1);
+    });
+  }
+  function deriveOrder(prevOrder, candidates) {
+    const result = [];
+    for (let i = 0; i < prevOrder.length; i += 2) {
+      const a = prevOrder[i], b = prevOrder[i + 1];
+      if (!b) continue;
+      const parent = findParent(a.api_id, b.api_id, candidates);
+      if (parent) result.push(parent);
+    }
+    return result;
+  }
+  const r16Order   = deriveOrder(r32Order,   byType['r16']   || []);
+  const qfOrder    = deriveOrder(r16Order,   byType['qf']    || []);
+  const sfOrder    = deriveOrder(qfOrder,    byType['sf']    || []);
+  const finalOrder = deriveOrder(sfOrder,    byType['final'] || []);
+  return {
+    r32: r32Order, r16: r16Order, qf: qfOrder, sf: sfOrder,
+    final: finalOrder.length ? finalOrder : (byType['final'] || []),
+  };
+}
+
+function koTeamRow(name, teamId, score, finished) {
+  const tbd = !name || !teamId || teamId === '0';
+  const flag = !tbd ? (TEAM_FLAGS[name] || '') : '';
+  const scoreHtml = finished && score != null ? `<span class="ko-score">${score}</span>` : '';
+  if (tbd) {
+    return `<div class="ko-team-row"><span class="ko-shield"></span><span class="ko-name ko-tbd">TBD</span>${scoreHtml}</div>`;
+  }
+  return `<div class="ko-team-row"><span class="ko-flag">${flag}</span><span class="ko-name">${escHtml(name)}</span>${scoreHtml}</div>`;
+}
+
+function koCardHtml(m) {
+  const dateStr = m.local_date_ict
+    ? formatDateLabel(m.local_date_ict.split(' ')[0]) + ', ' + m.local_date_ict.split(' ')[1]
+    : '—';
+  return `<div class="ko-card">
+  <div class="ko-date">${escHtml(dateStr)}</div>
+  ${koTeamRow(m.home_team, m.home_team_id, m.home_score, m.finished)}
+  ${koTeamRow(m.away_team, m.away_team_id, m.away_score, m.finished)}
+</div>`;
+}
+
+// SVG bracket connector: vertical bar connecting two card centers with a stub going right.
+// Uses percentage coordinates so it scales to any card height without JS measurement.
+const PAIR_CONN = `<div class="ko-pair-conn-wrap"><svg class="ko-pair-conn" xmlns="http://www.w3.org/2000/svg"><line x1="0%" y1="25%" x2="50%" y2="25%"/><line x1="50%" y1="25%" x2="50%" y2="75%"/><line x1="0%" y1="75%" x2="50%" y2="75%"/><line x1="50%" y1="50%" x2="100%" y2="50%"/></svg></div>`;
+
+async function getKnockoutMatches() {
+  const result = await db.execute(`
+    SELECT id, api_id, home_team, away_team, home_team_id, away_team_id,
+           home_team_label, away_team_label, type,
+           local_date_ict, home_score, away_score, finished
+    FROM matches
+    WHERE type IN ('r32', 'r16', 'qf', 'sf', 'third', 'final')
+    ORDER BY local_date_ict ASC
+  `);
+  return result.rows;
+}
+
+function renderKnockoutPage(matches) {
+  const byTypeDate = {};
+  for (const r of KO_ROUNDS_CFG) byTypeDate[r.type] = [];
+  for (const m of matches) {
+    if (byTypeDate[m.type]) byTypeDate[m.type].push(m);
+  }
+
+  // Default: earliest round with at least one unfinished match; fallback to 'final'
+  let defaultPhase = 'final';
+  for (const r of KO_ROUNDS_CFG) {
+    if (byTypeDate[r.type].some(m => !m.finished)) {
+      defaultPhase = r.type;
+      break;
+    }
+  }
+
+  // Bracket order gives correct pairing (adjacent pairs feed same next-round slot)
+  const bracketOrder = buildBracketOrder(matches);
+
+  const optionsHtml = KO_ROUNDS_CFG.map(r =>
+    `<option value="${r.type}"${r.type === defaultPhase ? ' selected' : ''}>${escHtml(r.label)}</option>`
+  ).join('');
+
+  let phasesHtml = '';
+  for (const r of KO_ROUNDS_CFG) {
+    const roundMatches = (bracketOrder && bracketOrder[r.type] && bracketOrder[r.type].length)
+      ? bracketOrder[r.type]
+      : byTypeDate[r.type];
+
+    let innerHtml = '';
+    if (!roundMatches || roundMatches.length === 0) {
+      innerHtml = `<p class="ko-empty">No matches scheduled yet.</p>`;
+    } else if (roundMatches.length === 1) {
+      innerHtml = `<div class="ko-single">${koCardHtml(roundMatches[0])}</div>`;
+    } else {
+      for (let i = 0; i < roundMatches.length; i += 2) {
+        const a = roundMatches[i];
+        const b = roundMatches[i + 1];
+        if (!b) {
+          innerHtml += koCardHtml(a);
+        } else {
+          innerHtml += `<div class="ko-pair-group"><div class="ko-pair-cards">${koCardHtml(a)}${koCardHtml(b)}</div>${PAIR_CONN}</div>`;
+        }
+      }
+    }
+
+    phasesHtml += `<div class="ko-phase" data-phase="${r.type}"${r.type !== defaultPhase ? ' style="display:none"' : ''}><div class="ko-bracket-view">${innerHtml}</div></div>`;
+  }
+
+  const mainContent = matches.length
+    ? `<section class="selector-card">
+  <label for="phase-select">Select round</label>
+  <div class="select-wrapper">
+    <select id="phase-select">${optionsHtml}</select>
+  </div>
+</section>
+<div class="ko-list">${phasesHtml}</div>`
+    : `<div class="placeholder-msg"><strong>Knockout bracket</strong>No knockout matches found.</div>`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Var Council — Knockout</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>⚽</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0F172A; --surface: #1E293B; --surface-2: #263347; --border: #334155;
+      --accent: #38BDF8; --accent-dim: rgba(56,189,248,0.15);
+      --text: #F1F5F9; --text-muted: #94A3B8; --radius: 10px;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Space Grotesk', system-ui, sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 48px 20px 80px; }
+    .site-header { width: 100%; max-width: 740px; margin-bottom: 48px; display: flex; flex-direction: column; gap: 6px; }
+    .site-header .eyebrow { font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); }
+    .site-header h1 { font-size: clamp(28px,5vw,42px); font-weight: 700; line-height: 1.1; color: var(--text); letter-spacing: -0.02em; }
+    .site-header h1 em { font-style: normal; color: var(--accent); }
+    .site-header .subtitle { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+    .page-nav { width: 100%; max-width: 740px; margin-bottom: 24px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .page-nav a { display: inline-flex; align-items: center; gap: 6px; font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); text-decoration: none; padding: 8px 14px; border: 1px solid var(--accent); border-radius: 6px; transition: background 0.15s; }
+    .page-nav a:hover { background: var(--accent-dim); }
+    .page-nav a.active { background: var(--accent); color: #0F172A; }
+    .selector-card { width: 100%; max-width: 740px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px 28px 32px; margin-bottom: 24px; }
+    .selector-card label { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 12px; font-family: 'Space Mono', monospace; }
+    .select-wrapper { position: relative; }
+    .select-wrapper::after { content: '▾'; position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: var(--accent); pointer-events: none; font-size: 14px; }
+    select#phase-select { width: 100%; appearance: none; -webkit-appearance: none; background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 13px 44px 13px 16px; font-family: 'Space Mono', monospace; font-size: 13px; cursor: pointer; outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
+    select#phase-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+    select#phase-select option { background: #1E293B; color: var(--text); padding: 8px 0; }
+    .ko-list { width: 100%; max-width: 740px; }
+    .ko-bracket-view { display: flex; flex-direction: column; gap: 16px; width: 100%; }
+    .ko-pair-group { display: flex; flex-direction: row; align-items: stretch; width: 320px; margin: 0 auto; }
+    .ko-pair-cards { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+    .ko-single { width: 320px; margin: 0 auto; }
+    .ko-pair-conn-wrap { width: 28px; flex-shrink: 0; position: relative; align-self: stretch; }
+    .ko-pair-conn { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: visible; }
+    .ko-pair-conn line { stroke: var(--border); stroke-width: 1.5; stroke-linecap: round; fill: none; }
+    .ko-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+    .ko-date { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--text-muted); }
+    .ko-team-row { display: flex; align-items: center; gap: 7px; }
+    .ko-shield { width: 15px; height: 17px; flex-shrink: 0; background: var(--border); clip-path: polygon(50% 0%, 100% 14%, 100% 62%, 50% 100%, 0% 62%, 0% 14%); }
+    .ko-flag { font-size: 15px; line-height: 1; width: 20px; text-align: center; flex-shrink: 0; }
+    .ko-name { font-size: 13px; font-weight: 500; color: var(--text); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ko-tbd { color: var(--text-muted); font-weight: 400; }
+    .ko-score { font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700; color: var(--text); margin-left: auto; flex-shrink: 0; }
+    .ko-empty { font-size: 13px; color: var(--text-muted); text-align: center; padding: 24px 0; }
+    .placeholder-msg { background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius); padding: 40px; text-align: center; color: var(--text-muted); font-size: 14px; }
+    .placeholder-msg strong { display: block; font-size: 16px; color: var(--text); margin-bottom: 6px; }
+    @media (max-width: 560px) {
+      .selector-card { padding: 18px 14px 22px; }
+      select#phase-select { font-size: 12px; padding: 10px 36px 10px 12px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <p class="eyebrow">THE VAR COUNCIL</p>
+    <h1><em>Knockout</em></h1>
+    <p class="subtitle">World Cup 2026 knockout stage — one round at a time.</p>
+  </header>
+  <nav class="page-nav">
+    <a href="/">Predictions</a>
+    <a href="/leaderboard">Leaderboard</a>
+    <a href="/tables">Tables</a>
+    <a href="/knockout" class="active">Knockout</a>
+  </nav>
+  <main style="width:100%;max-width:740px;">
+    ${mainContent}
+  </main>
+  <script>
+    var sel = document.getElementById('phase-select');
+    if (sel) {
+      sel.addEventListener('change', function() {
+        document.querySelectorAll('.ko-phase').forEach(function(el) {
+          el.style.display = el.dataset.phase === sel.value ? '' : 'none';
+        });
+      });
+    }
+  </script>
+</body>
+</html>`;
+}
+
+app.get('/knockout', async (_req, res) => {
+  try {
+    const matches = await getKnockoutMatches();
+    res.send(renderKnockoutPage(matches));
+  } catch (err) {
+    console.error('Knockout error:', err);
+    res.status(500).send('Error loading knockout bracket');
+  }
+});
 
 const inFlight = new Map();
 
