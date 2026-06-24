@@ -9,35 +9,39 @@ app.use(express.json());
 app.use('/icons', express.static(path.join(__dirname, '../public/icons')));
 
 const TEAM_FLAGS = {
-  'Algeria': '🇩🇿', 'Argentina': '🇦🇷', 'Australia': '🇦🇺', 'Austria': '🇦🇹',
-  'Belgium': '🇧🇪', 'Bosnia and Herzegovina': '🇧🇦', 'Brazil': '🇧🇷',
-  'Canada': '🇨🇦', 'Cape Verde': '🇨🇻', 'Colombia': '🇨🇴', 'Croatia': '🇭🇷',
-  'Curaçao': '🇨🇼', 'Czech Republic': '🇨🇿',
-  'Democratic Republic of the Congo': '🇨🇩',
-  'Ecuador': '🇪🇨', 'Egypt': '🇪🇬', 'England': '🏴󠁧󠁢󠁥󠁮󠁧󠁿',
-  'France': '🇫🇷', 'Germany': '🇩🇪', 'Ghana': '🇬🇭',
-  'Haiti': '🇭🇹',
-  'Iran': '🇮🇷', 'Iraq': '🇮🇶', 'Ivory Coast': '🇨🇮',
-  'Japan': '🇯🇵', 'Jordan': '🇯🇴',
-  'Mexico': '🇲🇽', 'Morocco': '🇲🇦',
-  'Netherlands': '🇳🇱', 'New Zealand': '🇳🇿', 'Norway': '🇳🇴',
-  'Panama': '🇵🇦', 'Paraguay': '🇵🇾', 'Portugal': '🇵🇹',
-  'Qatar': '🇶🇦',
-  'Saudi Arabia': '🇸🇦', 'Scotland': '🏴󠁧󠁢󠁳󠁣󠁴󠁿', 'Senegal': '🇸🇳',
-  'South Africa': '🇿🇦', 'South Korea': '🇰🇷', 'Spain': '🇪🇸', 'Sweden': '🇸🇪',
-  'Switzerland': '🇨🇭',
-  'Tunisia': '🇹🇳', 'Turkey': '🇹🇷',
-  'United States': '🇺🇸', 'Uruguay': '🇺🇾', 'Uzbekistan': '🇺🇿',
+  'Algeria': 'dz', 'Argentina': 'ar', 'Australia': 'au', 'Austria': 'at',
+  'Belgium': 'be', 'Bosnia and Herzegovina': 'ba', 'Brazil': 'br',
+  'Canada': 'ca', 'Cape Verde': 'cv', 'Colombia': 'co', 'Croatia': 'hr',
+  'Curaçao': 'cw', 'Czech Republic': 'cz',
+  'Democratic Republic of the Congo': 'cd',
+  'Ecuador': 'ec', 'Egypt': 'eg', 'England': 'gb-eng',
+  'France': 'fr', 'Germany': 'de', 'Ghana': 'gh',
+  'Haiti': 'ht',
+  'Iran': 'ir', 'Iraq': 'iq', 'Ivory Coast': 'ci',
+  'Japan': 'jp', 'Jordan': 'jo',
+  'Mexico': 'mx', 'Morocco': 'ma',
+  'Netherlands': 'nl', 'New Zealand': 'nz', 'Norway': 'no',
+  'Panama': 'pa', 'Paraguay': 'py', 'Portugal': 'pt',
+  'Qatar': 'qa',
+  'Saudi Arabia': 'sa', 'Scotland': 'gb-sct', 'Senegal': 'sn',
+  'South Africa': 'za', 'South Korea': 'kr', 'Spain': 'es', 'Sweden': 'se',
+  'Switzerland': 'ch',
+  'Tunisia': 'tn', 'Turkey': 'tr',
+  'United States': 'us', 'Uruguay': 'uy', 'Uzbekistan': 'uz',
 };
 
+function flagImg(code) {
+  return `<img src="https://flagcdn.com/w20/${code}.png" alt="" style="height:15px;vertical-align:middle;margin-right:4px;" onerror="this.style.display='none'">`;
+}
+
 function teamWithFlag(name) {
-  const flag = TEAM_FLAGS[name];
-  return flag ? `${flag} ${name}` : name;
+  const code = TEAM_FLAGS[name];
+  return code ? `${flagImg(code)} ${name}` : name;
 }
 
 function teamWithFlagAfter(name) {
-  const flag = TEAM_FLAGS[name];
-  return flag ? `${name} ${flag}` : name;
+  const code = TEAM_FLAGS[name];
+  return code ? `${name} ${flagImg(code)}` : name;
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -89,23 +93,31 @@ function renderPage({ matches, syncError }) {
     byDate.get(datePart).push(m);
   }
 
-  const options = [...byDate.entries()]
+  const matchData = [...byDate.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([datePart, dayMatches]) => {
-      const label = formatDateLabel(datePart);
-      const opts = dayMatches
+      const [, month, day] = datePart.split('-').map(Number);
+      const shortLabel = `${MONTHS[month - 1]} ${day}`;
+      const mList = dayMatches
         .sort((a, b) => (a.local_date_ict || '').localeCompare(b.local_date_ict || ''))
         .map((m) => {
           const home = m.home_team || m.home_team_label || '?';
           const away = m.away_team || m.away_team_label || '?';
-          const score = m.finished ? `${m.home_score}–${m.away_score}` : '?–?';
-          const optLabel = `${formatTimeOnly(m.local_date_ict)}  ${teamWithFlag(home)} ${score} ${teamWithFlagAfter(away)}`;
-          return `<option value="${m.id}" data-home="${escAttr(home)}" data-away="${escAttr(away)}">${optLabel}</option>`;
-        })
-        .join('\n            ');
-      return `<optgroup label="${escAttr(label)}">\n            ${opts}\n          </optgroup>`;
-    })
-    .join('\n          ');
+          const timePart = m.local_date_ict ? m.local_date_ict.split(' ')[1] : null;
+          return {
+            id: m.id,
+            home,
+            away,
+            homeFlag: TEAM_FLAGS[home] ? flagImg(TEAM_FLAGS[home]) : '',
+            awayFlag: TEAM_FLAGS[away] ? flagImg(TEAM_FLAGS[away]) : '',
+            time: timePart || '—',
+            finished: !!m.finished,
+            homeScore: m.home_score ?? null,
+            awayScore: m.away_score ?? null,
+          };
+        });
+      return { datePart, shortLabel, matches: mList };
+    });
 
   const errorBanner = syncError
     ? `<div class="error-banner">
@@ -212,88 +224,118 @@ function renderPage({ matches, syncError }) {
       font-size: 16px;
     }
 
-    /* ── Match selector card ── */
-    .selector-card {
+    /* ── Date strip ── */
+    .date-strip {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .date-strip::-webkit-scrollbar { display: none; }
+
+    .date-chip {
+      flex-shrink: 0;
+      padding: 8px 16px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-muted);
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      letter-spacing: 0.04em;
+      transition: border-color 0.15s, background 0.15s, color 0.15s;
+    }
+    .date-chip:hover { border-color: var(--accent); color: var(--text); }
+    .date-chip.active { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
+
+    /* ── Match cards ── */
+    .match-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .match-card {
       width: 100%;
-      max-width: 740px;
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 28px 28px 32px;
-    }
-
-    .selector-card label {
-      display: block;
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      margin-bottom: 12px;
-      font-family: 'Space Mono', monospace;
-    }
-
-    .select-wrapper {
-      position: relative;
-    }
-
-    .select-wrapper::after {
-      content: '▾';
-      position: absolute;
-      right: 16px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--accent);
-      pointer-events: none;
-      font-size: 14px;
-    }
-
-    select#match-select {
-      width: 100%;
-      appearance: none;
-      -webkit-appearance: none;
-      background: var(--surface-2);
-      color: var(--text);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 13px 44px 13px 16px;
-      font-family: 'Space Mono', monospace;
-      font-size: 13px;
+      padding: 16px 20px;
       cursor: pointer;
-      outline: none;
-      transition: border-color 0.15s, box-shadow 0.15s;
-    }
-
-    select#match-select:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-dim);
-    }
-
-    select#match-select option {
-      background: #1E293B;
+      display: grid;
+      grid-template-columns: 44px 1fr auto 1fr;
+      align-items: center;
+      gap: 12px;
+      text-align: left;
+      font-family: inherit;
       color: var(--text);
-      padding: 8px 0;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .match-card:hover { border-color: var(--accent); background: var(--surface-2); }
+    .match-card.selected { border-color: var(--accent); background: var(--accent-dim); }
+
+    .match-card-time {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
     }
 
-    select#match-select option.opt-disabled {
-      color: var(--disabled);
+    .match-card-home {
+      font-size: 14px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
+
+    .match-card-score {
+      font-family: 'Space Mono', monospace;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-align: center;
+      white-space: nowrap;
+      padding: 0 4px;
+    }
+
+    .match-card-away {
+      font-size: 14px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: right;
+    }
+
+    /* ── Back button ── */
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--accent);
+      cursor: pointer;
+      padding: 8px 0;
+      border: none;
+      background: none;
+      transition: opacity 0.15s;
+    }
+    .back-btn:hover { opacity: 0.75; }
 
     .selector-hint {
       margin-top: 12px;
       font-size: 12px;
       color: var(--text-muted);
-    }
-
-    .selector-hint span {
-      display: inline-block;
-      width: 10px;
-      height: 10px;
-      background: var(--disabled);
-      border-radius: 2px;
-      margin-right: 5px;
-      vertical-align: middle;
-      opacity: 0.6;
     }
 
     /* ── Placeholder content area (future: prediction table) ── */
@@ -554,8 +596,11 @@ function renderPage({ matches, syncError }) {
       .site-header { margin-bottom: 32px; }
       .site-header .subtitle { font-size: 13px; }
 
-      .selector-card { padding: 18px 14px 22px; }
-      select#match-select { font-size: 12px; padding: 10px 36px 10px 12px; }
+      .date-chip { font-size: 11px; padding: 6px 12px; }
+      .match-card { padding: 12px 14px; gap: 8px; }
+      .match-card-home, .match-card-away { font-size: 13px; }
+      .match-card-score { font-size: 12px; }
+      .match-card-time { font-size: 10px; }
       .selector-hint { font-size: 11px; }
 
       .page-nav { margin-bottom: 18px; }
@@ -593,31 +638,25 @@ function renderPage({ matches, syncError }) {
   </nav>
 
   <main style="width:100%;max-width:740px;">
-    <section class="selector-card">
-      <label for="match-select">Select a match</label>
-      <div class="select-wrapper">
-        <select id="match-select">
-          <option value="" disabled selected>— choose a match —</option>
-          ${options}
-        </select>
-      </div>
-      <p class="selector-hint">
-        All times in ICT (UTC+7). Knockout matches with unconfirmed teams are hidden until qualified.
-      </p>
-    </section>
-
-    <div id="prediction-area" class="prediction-area">
-      <div class="placeholder-msg">
-        Select a match above to load AI predictions.
-      </div>
-    </div>
+    <div id="nav-area"></div>
+    <p class="selector-hint" id="strip-hint">All times in ICT (UTC+7). Knockout matches with unconfirmed teams are hidden until qualified.</p>
+    <div id="match-area" class="match-grid" style="display:none"></div>
+    <div id="prediction-area" class="prediction-area" style="display:none"></div>
   </main>
 
   <script>
   (function () {
-    var sel  = document.getElementById('match-select');
-    var area = document.getElementById('prediction-area');
+    var MATCH_DATA = ${JSON.stringify(matchData)};
 
+    var navArea   = document.getElementById('nav-area');
+    var matchArea = document.getElementById('match-area');
+    var area      = document.getElementById('prediction-area');
+    var hint      = document.getElementById('strip-hint');
+
+    var activeDate    = null;
+    var activeMatchId = null;
+
+    /* ── Helpers ── */
     function esc(s) {
       return String(s)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -721,12 +760,8 @@ function renderPage({ matches, syncError }) {
             ? '<span class="bubble-reason" style="font-style:italic">Prediction unavailable</span>'
             : '<span class="bubble-reason">' + esc(p.reasoning || '') + '</span>';
 
-          var historyHtml = (p.history && p.history.length > 0)
-            ? ' | <span class="model-history">' + p.history.map(function(h) { return h === 'correct' ? '✓' : '✗'; }).join('') + '</span>'
-            : '';
-
           return '<div class="chat-row ' + side + '">' +
-            '<div class="chat-sender">' + modelIcon(p.model_name) + esc(p.model_name) + historyHtml + '</div>' +
+            '<div class="chat-sender">' + modelIcon(p.model_name) + esc(p.model_name) + '</div>' +
             '<div class="chat-bubble">' +
               badgeHtml +
               reasonHtml +
@@ -755,7 +790,7 @@ function renderPage({ matches, syncError }) {
         if (r.ok) {
           var data = await r.json();
           if (data.predictions && data.predictions.length >= 8) {
-            if (sel.value !== String(matchId)) return;
+            if (activeMatchId !== String(matchId)) return;
             area.innerHTML = renderBubbles(data.predictions, data.match, home, away);
             return;
           }
@@ -768,83 +803,160 @@ function renderPage({ matches, syncError }) {
         var r2 = await fetch('/api/predict/' + matchId, { method: 'POST' });
         if (!r2.ok) throw new Error('HTTP ' + r2.status);
         var data2 = await r2.json();
-        if (sel.value !== String(matchId)) return;
+        if (activeMatchId !== String(matchId)) return;
         area.innerHTML = renderBubbles(data2.predictions, data2.match, home, away);
       } catch (err) {
-        if (sel.value !== String(matchId)) return;
+        if (activeMatchId !== String(matchId)) return;
         area.innerHTML =
           '<div class="placeholder-msg"><strong>Error</strong>Could not load predictions. Please try again.</div>';
       }
     }
 
-    var debounceTimer = null;
-    sel.addEventListener('change', function () {
-      var opt     = sel.options[sel.selectedIndex];
-      var matchId = sel.value;
-      var home    = (opt.dataset && opt.dataset.home) || 'Home';
-      var away    = (opt.dataset && opt.dataset.away) || 'Away';
-      showSpinner(false);
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(function () { loadPredictions(matchId, home, away); }, 1000);
+    /* ── Date strip ── */
+    function renderDateStrip() {
+      var html = '';
+      for (var i = 0; i < MATCH_DATA.length; i++) {
+        var d = MATCH_DATA[i];
+        var active = d.datePart === activeDate ? ' active' : '';
+        html += '<button class="date-chip' + active + '" data-date="' + esc(d.datePart) + '" data-short="' + esc(d.shortLabel) + '">' + esc(d.shortLabel) + '</button>';
+      }
+      return '<div class="date-strip">' + html + '</div>';
+    }
+
+    function attachChipListeners() {
+      navArea.querySelectorAll('.date-chip').forEach(function (chip) {
+        chip.addEventListener('click', function () { showMatchCards(chip.dataset.date); });
+      });
+    }
+
+    /* ── Match cards ── */
+    function renderMatchCards(group) {
+      var html = '';
+      for (var i = 0; i < group.matches.length; i++) {
+        var m = group.matches[i];
+        var selected = String(m.id) === String(activeMatchId) ? ' selected' : '';
+        var scoreStr = m.finished ? (m.homeScore + '–' + m.awayScore) : 'vs';
+        html += '<button class="match-card' + selected + '" data-id="' + m.id + '" data-home="' + esc(m.home) + '" data-away="' + esc(m.away) + '">' +
+          '<span class="match-card-time">' + esc(m.time) + '</span>' +
+          '<span class="match-card-home">' + m.homeFlag + ' ' + esc(m.home) + '</span>' +
+          '<span class="match-card-score">' + esc(scoreStr) + '</span>' +
+          '<span class="match-card-away">' + esc(m.away) + ' ' + m.awayFlag + '</span>' +
+        '</button>';
+      }
+      return html;
+    }
+
+    function attachCardListeners(group) {
+      matchArea.querySelectorAll('.match-card').forEach(function (card) {
+        card.addEventListener('click', function () {
+          gotoPredictions(card.dataset.id, card.dataset.home, card.dataset.away, group.datePart, group.shortLabel);
+        });
+      });
+    }
+
+    /* ── State transitions ── */
+    function showMatchCards(datePart) {
+      activeDate = datePart;
+      var activeChip = null;
+      navArea.querySelectorAll('.date-chip').forEach(function (chip) {
+        var isActive = chip.dataset.date === datePart;
+        chip.classList.toggle('active', isActive);
+        if (isActive) activeChip = chip;
+      });
+      if (activeChip) activeChip.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      var group = null;
+      for (var i = 0; i < MATCH_DATA.length; i++) {
+        if (MATCH_DATA[i].datePart === datePart) { group = MATCH_DATA[i]; break; }
+      }
+      if (!group) return;
+      matchArea.innerHTML = renderMatchCards(group);
+      attachCardListeners(group);
+      matchArea.style.display = '';
+      area.style.display = 'none';
+      hint.style.display = '';
+    }
+
+    function gotoPredictions(matchId, home, away, datePart, shortLabel) {
+      activeMatchId = String(matchId);
+      navArea.innerHTML = '<button class="back-btn">← ' + esc(shortLabel) + '</button>';
+      navArea.querySelector('.back-btn').addEventListener('click', function () {
+        navArea.innerHTML = renderDateStrip();
+        attachChipListeners();
+        hint.style.display = '';
+        area.style.display = 'none';
+        showMatchCards(datePart);
+      });
+      matchArea.style.display = 'none';
+      area.style.display = '';
+      hint.style.display = 'none';
+      loadPredictions(matchId, home, away);
+    }
+
+    /* ── Vote bar tooltips (delegated once to area) ── */
+    var isTouch = false;
+    document.addEventListener('touchstart', function () { isTouch = true; }, { once: true });
+
+    function tooltipFor(container) { return container.querySelector('.vb-tooltip'); }
+
+    function showTooltip(seg) {
+      var container = seg.closest('.vote-bar-container');
+      var tooltip   = tooltipFor(container);
+      var names     = JSON.parse(seg.getAttribute('data-voters') || '[]');
+      tooltip.innerHTML = '<ul>' + names.map(function (n) {
+        return '<li>' + modelIcon(n) + esc(n) + '</li>';
+      }).join('') + '</ul>';
+      var cRect = container.getBoundingClientRect();
+      var sRect = seg.getBoundingClientRect();
+      tooltip.style.left = (sRect.left + sRect.width / 2 - cRect.left) + 'px';
+      tooltip.classList.add('active');
+    }
+
+    function hideAll() {
+      area.querySelectorAll('.vb-tooltip.active').forEach(function (t) { t.classList.remove('active'); });
+    }
+
+    area.addEventListener('mouseover', function (e) {
+      if (isTouch) return;
+      var seg = e.target.closest('.vb-seg');
+      if (!seg) return;
+      showTooltip(seg);
     });
 
-    // Vote bar segment tooltips
-    (function () {
-      var isTouch = false;
-      document.addEventListener('touchstart', function () { isTouch = true; }, { once: true });
+    area.addEventListener('mouseout', function (e) {
+      if (isTouch) return;
+      var seg = e.target.closest('.vb-seg');
+      if (!seg) return;
+      if (!seg.contains(e.relatedTarget)) hideAll();
+    });
 
-      function tooltipFor(container) {
-        return container.querySelector('.vb-tooltip');
+    area.addEventListener('click', function (e) {
+      if (!isTouch) return;
+      var seg = e.target.closest('.vb-seg');
+      if (!seg) { hideAll(); return; }
+      var container = seg.closest('.vote-bar-container');
+      var tooltip   = tooltipFor(container);
+      var wasActive = tooltip.classList.contains('active');
+      hideAll();
+      if (!wasActive) showTooltip(seg);
+    });
+
+    /* ── Init ── */
+    navArea.innerHTML = renderDateStrip();
+    attachChipListeners();
+
+    // Auto-select today in ICT (UTC+7), or nearest upcoming date
+    var nowICT   = new Date(Date.now() + 7 * 60 * 60 * 1000);
+    var todayStr = nowICT.toISOString().slice(0, 10);
+    var autoDate = null;
+    for (var ai = 0; ai < MATCH_DATA.length; ai++) {
+      if (MATCH_DATA[ai].datePart === todayStr) { autoDate = todayStr; break; }
+    }
+    if (!autoDate) {
+      for (var aj = 0; aj < MATCH_DATA.length; aj++) {
+        if (MATCH_DATA[aj].datePart > todayStr) { autoDate = MATCH_DATA[aj].datePart; break; }
       }
-
-      function showTooltip(seg) {
-        var container = seg.closest('.vote-bar-container');
-        var tooltip   = tooltipFor(container);
-        var names     = JSON.parse(seg.getAttribute('data-voters') || '[]');
-        tooltip.innerHTML = '<ul>' + names.map(function (n) {
-          return '<li>' + modelIcon(n) + esc(n) + '</li>';
-        }).join('') + '</ul>';
-        var cRect = container.getBoundingClientRect();
-        var sRect = seg.getBoundingClientRect();
-        tooltip.style.left = (sRect.left + sRect.width / 2 - cRect.left) + 'px';
-        tooltip.classList.add('active');
-      }
-
-      function hideAll() {
-        area.querySelectorAll('.vb-tooltip.active').forEach(function (t) {
-          t.classList.remove('active');
-        });
-      }
-
-      // Desktop hover
-      area.addEventListener('mouseover', function (e) {
-        if (isTouch) return;
-        var seg = e.target.closest('.vb-seg');
-        if (!seg) return;
-        showTooltip(seg);
-      });
-
-      area.addEventListener('mouseout', function (e) {
-        if (isTouch) return;
-        var seg = e.target.closest('.vb-seg');
-        if (!seg) return;
-        if (!seg.contains(e.relatedTarget)) {
-          hideAll();
-        }
-      });
-
-      // Mobile tap
-      area.addEventListener('click', function (e) {
-        if (!isTouch) return;
-        var seg = e.target.closest('.vb-seg');
-        if (!seg) { hideAll(); return; }
-        var container = seg.closest('.vote-bar-container');
-        var tooltip   = tooltipFor(container);
-        var wasActive = tooltip.classList.contains('active');
-        hideAll();
-        if (!wasActive) showTooltip(seg);
-      });
-    })();
+    }
+    if (autoDate) showMatchCards(autoDate);
   })();
   </script>
 </body>
@@ -1547,9 +1659,13 @@ function renderTablesPage(groups) {
     return n > 0 ? '+' + n : String(n);
   }
 
+  const groupStrip = `<div class="group-strip">
+    ${groups.map((g, i) => `<button class="group-chip${i === 0 ? ' active' : ''}" data-group="${escHtml(g.name)}">${escHtml(g.name)}</button>`).join('')}
+  </div>`;
+
   const groupCards = groups.map(({ name, teams }) => {
     const rows = teams.map((t, i) => {
-      const flag = TEAM_FLAGS[t.name] || '';
+      const flag = TEAM_FLAGS[t.name] ? flagImg(TEAM_FLAGS[t.name]) : '';
       const last3html = t.last3.map(ri).join('');
       return `<tr>
             <td class="gt-rank">${i + 1}</td>
@@ -1566,7 +1682,7 @@ function renderTablesPage(groups) {
           </tr>`;
     }).join('');
 
-    return `<div class="group-card">
+    return `<div class="group-card" data-group="${escHtml(name)}">
       <div class="group-card-header">${escHtml(name)}</div>
       <div class="group-table-wrap">
         <table class="group-table">
@@ -1686,16 +1802,42 @@ function renderTablesPage(groups) {
     .page-nav a:hover { background: var(--accent-dim); }
     .page-nav a.active { background: var(--accent); color: #0F172A; }
 
+    /* ── Group strip ── */
+    .group-strip {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      margin-bottom: 16px;
+    }
+    .group-strip::-webkit-scrollbar { display: none; }
+
+    .group-chip {
+      flex-shrink: 0;
+      padding: 8px 16px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text-muted);
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      letter-spacing: 0.04em;
+      transition: border-color 0.15s, background 0.15s, color 0.15s;
+    }
+    .group-chip:hover { border-color: var(--accent); color: var(--text); }
+    .group-chip.active { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
+
     /* ── Groups grid ── */
     .groups-grid {
       width: 100%;
       display: grid;
       grid-template-columns: 1fr;
       gap: 16px;
-    }
-
-    @media (min-width: 700px) {
-      .groups-grid { grid-template-columns: repeat(2, 1fr); }
     }
 
 
@@ -1724,6 +1866,7 @@ function renderTablesPage(groups) {
     /* ── Group table ── */
     .group-table {
       width: 100%;
+      min-width: 440px;
       table-layout: fixed;
       border-collapse: collapse;
       font-size: 13px;
@@ -1744,7 +1887,6 @@ function renderTablesPage(groups) {
     .group-table tbody td {
       padding: 10px 6px;
       border-bottom: 1px solid var(--border);
-      white-space: nowrap;
       vertical-align: middle;
     }
 
@@ -1753,6 +1895,7 @@ function renderTablesPage(groups) {
     .gt-rank {
       text-align: center;
       width: 28px;
+      white-space: nowrap;
       color: var(--text-muted);
       font-family: 'Space Mono', monospace;
       font-size: 11px;
@@ -1768,6 +1911,7 @@ function renderTablesPage(groups) {
     .gt-num {
       text-align: center;
       width: 30px;
+      white-space: nowrap;
       font-family: 'Space Mono', monospace;
       color: var(--text-muted);
     }
@@ -1775,6 +1919,7 @@ function renderTablesPage(groups) {
     .gt-pts {
       text-align: center;
       width: 32px;
+      white-space: nowrap;
       font-family: 'Space Mono', monospace;
       font-weight: 700;
       color: var(--text);
@@ -1783,6 +1928,7 @@ function renderTablesPage(groups) {
     .gt-last3 {
       text-align: right;
       width: 76px;
+      white-space: nowrap;
       padding-right: 12px !important;
     }
 
@@ -1831,11 +1977,24 @@ function renderTablesPage(groups) {
     <a href="/knockout">Knockout</a>
   </nav>
 
-  <main style="width:100%;max-width:1280px;">
+  <main style="width:100%;max-width:740px;">
+    ${groupStrip}
     <div class="groups-grid">
       ${groupCards}
     </div>
   </main>
+  <script>
+    (function () {
+      var chips = document.querySelectorAll('.group-chip');
+      var cards = document.querySelectorAll('.group-card');
+      function showGroup(name) {
+        chips.forEach(function (c) { c.classList.toggle('active', c.dataset.group === name); });
+        cards.forEach(function (c) { c.style.display = c.dataset.group === name ? '' : 'none'; });
+      }
+      chips.forEach(function (c) { c.addEventListener('click', function () { showGroup(c.dataset.group); }); });
+      if (chips.length) showGroup(chips[0].dataset.group);
+    })();
+  </script>
 </body>
 </html>`;
 }
@@ -1843,12 +2002,12 @@ function renderTablesPage(groups) {
 // ─── Knockout bracket ──────────────────────────────────────────────────────
 
 const KO_ROUNDS_CFG = [
-  { type: 'r32',   label: 'Round of 32'   },
-  { type: 'r16',   label: 'Round of 16'   },
-  { type: 'qf',    label: 'Quarterfinals' },
-  { type: 'sf',    label: 'Semifinals'    },
-  { type: 'third', label: 'Third Place'   },
-  { type: 'final', label: 'Final'         },
+  { type: 'r32',   label: 'Round of 32',   short: 'R32'   },
+  { type: 'r16',   label: 'Round of 16',   short: 'R16'   },
+  { type: 'qf',    label: 'Quarterfinals', short: 'QF'    },
+  { type: 'sf',    label: 'Semifinals',    short: 'SF'     },
+  { type: 'third', label: 'Third Place',   short: '3RD'   },
+  { type: 'final', label: 'Final',         short: 'Final' },
 ];
 
 function parseMatchRef(label) {
@@ -1909,7 +2068,7 @@ function buildBracketOrder(allMatches) {
 
 function koTeamRow(name, teamId, score, finished) {
   const tbd = !name || !teamId || teamId === '0';
-  const flag = !tbd ? (TEAM_FLAGS[name] || '') : '';
+  const flag = !tbd && TEAM_FLAGS[name] ? flagImg(TEAM_FLAGS[name]) : '';
   const scoreHtml = finished && score != null ? `<span class="ko-score">${score}</span>` : '';
   if (tbd) {
     return `<div class="ko-team-row"><span class="ko-shield"></span><span class="ko-name ko-tbd">TBD</span>${scoreHtml}</div>`;
@@ -1963,8 +2122,8 @@ function renderKnockoutPage(matches) {
   // Bracket order gives correct pairing (adjacent pairs feed same next-round slot)
   const bracketOrder = buildBracketOrder(matches);
 
-  const optionsHtml = KO_ROUNDS_CFG.map(r =>
-    `<option value="${r.type}"${r.type === defaultPhase ? ' selected' : ''}>${escHtml(r.label)}</option>`
+  const chipsHtml = KO_ROUNDS_CFG.map(r =>
+    `<button class="ko-round-chip${r.type === defaultPhase ? ' active' : ''}" data-phase="${r.type}">${escHtml(r.short)}</button>`
   ).join('');
 
   let phasesHtml = '';
@@ -1994,12 +2153,7 @@ function renderKnockoutPage(matches) {
   }
 
   const mainContent = matches.length
-    ? `<section class="selector-card">
-  <label for="phase-select">Select round</label>
-  <div class="select-wrapper">
-    <select id="phase-select">${optionsHtml}</select>
-  </div>
-</section>
+    ? `<div class="ko-round-strip">${chipsHtml}</div>
 <div class="ko-list">${phasesHtml}</div>`
     : `<div class="placeholder-msg"><strong>Knockout bracket</strong>No knockout matches found.</div>`;
 
@@ -2030,13 +2184,11 @@ function renderKnockoutPage(matches) {
     .page-nav a { display: inline-flex; align-items: center; gap: 6px; font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); text-decoration: none; padding: 8px 14px; border: 1px solid var(--accent); border-radius: 6px; transition: background 0.15s; }
     .page-nav a:hover { background: var(--accent-dim); }
     .page-nav a.active { background: var(--accent); color: #0F172A; }
-    .selector-card { width: 100%; max-width: 740px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px 28px 32px; margin-bottom: 24px; }
-    .selector-card label { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 12px; font-family: 'Space Mono', monospace; }
-    .select-wrapper { position: relative; }
-    .select-wrapper::after { content: '▾'; position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: var(--accent); pointer-events: none; font-size: 14px; }
-    select#phase-select { width: 100%; appearance: none; -webkit-appearance: none; background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 13px 44px 13px 16px; font-family: 'Space Mono', monospace; font-size: 13px; cursor: pointer; outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
-    select#phase-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
-    select#phase-select option { background: #1E293B; color: var(--text); padding: 8px 0; }
+    .ko-round-strip { width: 100%; max-width: 740px; display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 24px; scrollbar-width: none; -ms-overflow-style: none; }
+    .ko-round-strip::-webkit-scrollbar { display: none; }
+    .ko-round-chip { flex-shrink: 0; padding: 8px 16px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; letter-spacing: 0.04em; transition: border-color 0.15s, background 0.15s, color 0.15s; }
+    .ko-round-chip:hover { border-color: var(--accent); color: var(--text); }
+    .ko-round-chip.active { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
     .ko-list { width: 100%; max-width: 740px; }
     .ko-bracket-view { display: flex; flex-direction: column; gap: 16px; width: 100%; }
     .ko-pair-group { display: flex; flex-direction: row; align-items: stretch; width: 320px; margin: 0 auto; }
@@ -2057,8 +2209,7 @@ function renderKnockoutPage(matches) {
     .placeholder-msg { background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius); padding: 40px; text-align: center; color: var(--text-muted); font-size: 14px; }
     .placeholder-msg strong { display: block; font-size: 16px; color: var(--text); margin-bottom: 6px; }
     @media (max-width: 560px) {
-      .selector-card { padding: 18px 14px 22px; }
-      select#phase-select { font-size: 12px; padding: 10px 36px 10px 12px; }
+      .ko-round-chip { font-size: 11px; padding: 7px 12px; }
     }
   </style>
 </head>
@@ -2078,14 +2229,15 @@ function renderKnockoutPage(matches) {
     ${mainContent}
   </main>
   <script>
-    var sel = document.getElementById('phase-select');
-    if (sel) {
-      sel.addEventListener('change', function() {
+    document.querySelectorAll('.ko-round-chip').forEach(function(chip) {
+      chip.addEventListener('click', function() {
+        document.querySelectorAll('.ko-round-chip').forEach(function(c) { c.classList.remove('active'); });
+        chip.classList.add('active');
         document.querySelectorAll('.ko-phase').forEach(function(el) {
-          el.style.display = el.dataset.phase === sel.value ? '' : 'none';
+          el.style.display = el.dataset.phase === chip.dataset.phase ? '' : 'none';
         });
       });
-    }
+    });
   </script>
 </body>
 </html>`;
